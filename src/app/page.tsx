@@ -13,7 +13,7 @@ import { LoginView } from '@/features/auth/LoginView';
 import { ExamSessionView } from '@/features/exam-session/ExamSessionView';
 import {
   clearPersistedExamState,
-  loadPersistedExamState,
+  loadPersistedExamStateAsync,
 } from '@/features/lockdown/sessionPersistence';
 import { ResultView } from '@/features/result/ResultView';
 
@@ -32,16 +32,21 @@ type AppStage =
 export default function HomePage() {
   const [stage, setStage] = useState<AppStage>({ kind: 'login' });
 
-  // Anti-Refresh Bypass: Jika ada sesi ujian aktif atau Hard Lock tersimpan, pulihkan langsung saat mount
+  // Anti-Refresh & Anti-Clear-Storage: pulihkan sesi aktif atau Hard Lock dari localStorage / IndexedDB
   useEffect(() => {
-    const persisted = loadPersistedExamState();
-    if (persisted) {
-      setStage({
-        kind: 'exam',
-        session: persisted.session,
-        initialPersisted: persisted,
-      });
-    }
+    let cancelled = false;
+    void loadPersistedExamStateAsync().then((persisted) => {
+      if (!cancelled && persisted) {
+        setStage({
+          kind: 'exam',
+          session: persisted.session,
+          initialPersisted: persisted,
+        });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (stage.kind === 'exam') {

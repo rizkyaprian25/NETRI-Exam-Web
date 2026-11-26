@@ -102,6 +102,8 @@ test.describe('Alur Lengkap E2E NETRI Exam Web v2 (PWA & Anti-Curang 9 Lapis):',
 
     await expect(page.getByText('🚨 PERINGATAN KECURANGAN!')).toBeVisible();
     await expect(page.getByText('1 Pelanggaran')).toBeVisible();
+    // Verifikasi Proctor Sightline Visual Beacon (bingkai merah 4 sisi) menyala
+    await expect(page.getByTestId('proctor-sightline-border')).toBeVisible();
     // Tombol kembali terkunci selama cooldown 5 detik sebelum bisa diklik
     await expect(page.getByRole('button', { name: /Tunggu \d+ detik/i })).toBeDisabled();
     await page.getByRole('button', { name: 'Saya Mengerti, Kembali ke Ujian' }).click({
@@ -121,12 +123,17 @@ test.describe('Alur Lengkap E2E NETRI Exam Web v2 (PWA & Anti-Curang 9 Lapis):',
     });
 
     await expect(page.getByText('🔒 SESI UJIAN TERKUNCI')).toBeVisible();
+    await expect(page.getByText('PANGGIL PENGAWAS RUANG — SESI TERKUNCI')).toBeVisible();
     await expect(page.getByText('TERKUNCI', { exact: true })).toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Saya Mengerti, Kembali ke Ujian' }),
     ).toHaveCount(0);
 
-    // 6. Uji Anti-Refresh Bypass: Tekan F5 / Reload halaman -> Sesi & Hard Lock WAJIB tetap terkunci!
+    // 6. Uji Anti-Clear-Storage & Anti-Refresh Bypass:
+    // Hapus localStorage secara sengaja lalu Refresh halaman -> IndexedDB Mirror wajib memulihkan Hard Lock!
+    await page.evaluate(() => {
+      window.localStorage.clear();
+    });
     await page.reload();
     await expect(page.getByText('🔒 SESI UJIAN TERKUNCI')).toBeVisible();
 
@@ -141,7 +148,7 @@ test.describe('Alur Lengkap E2E NETRI Exam Web v2 (PWA & Anti-Curang 9 Lapis):',
     await expect(page.getByText('🔒 SESI UJIAN TERKUNCI')).toHaveCount(0);
     await expect(page.getByText('2 Pelanggaran')).toBeVisible();
 
-    // 8. Kirim Form -> Masuk ResultView dengan Status Audit Pelanggaran
+    // 8. Kirim Form -> Masuk ResultView dengan Bukti Durasi Terkunci & Status Audit Pelanggaran
     await formFrame.getByRole('link', { name: 'Kirim Jawaban' }).click();
     await expect(formFrame.getByText('Jawaban Anda telah direkam')).toBeVisible();
     await page.getByRole('button', { name: 'Selesai Ujian' }).click();
@@ -149,6 +156,9 @@ test.describe('Alur Lengkap E2E NETRI Exam Web v2 (PWA & Anti-Curang 9 Lapis):',
 
     await expect(page.getByText('Sesi Ujian Selesai')).toBeVisible();
     await expect(page.getByText('BUKTI RESMI SELESAI')).toBeVisible();
+    await expect(page.getByTestId('locked-duration-value')).toBeVisible();
+    await expect(page.getByText('Waktu Mulai')).toBeVisible();
+    await expect(page.getByText('Waktu Selesai')).toBeVisible();
     await expect(page.getByText(/Tercatat 2 Pelanggaran/)).toBeVisible();
     await expect(page.getByText('Riwayat Catatan Pengawas')).toBeVisible();
 

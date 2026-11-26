@@ -1,6 +1,8 @@
 'use client';
 
-// Layar Bukti Selesai Ujian / ReceiptCard v2 (1:1 Mobile + Jam Live & Audit Trail Pelanggaran)
+// Layar Bukti Selesai Ujian / ReceiptCard v2.1
+// Menampilkan Jam Live berdenyut, Waktu Mulai, Waktu Selesai, Total Durasi Terkunci (anti-Incognito/reset),
+// Status Integritas, serta Riwayat Audit Pelanggaran untuk diperiksa Pengawas Ruang.
 
 import { useEffect, useState } from 'react';
 import {
@@ -14,6 +16,7 @@ import {
   Home,
   Info,
   ShieldCheck,
+  Timer,
 } from 'lucide-react';
 import type { ActiveExamSession, ViolationLogEntry } from '@/contracts/exam';
 
@@ -32,6 +35,23 @@ function formatWibSeconds(isoOrDate: string | Date): string {
   const mm = String(d.getMinutes()).padStart(2, '0');
   const ss = String(d.getSeconds()).padStart(2, '0');
   return `${hh}:${mm}:${ss} WIB`;
+}
+
+/** Menghitung dan memformat selisih waktu terkunci antara mulai dan selesai ujian */
+function formatLockedDuration(startedAtIso: string, finishedAtIso: string): {
+  label: string;
+  totalMinutes: number;
+} {
+  const startMs = new Date(startedAtIso).getTime();
+  const endMs = new Date(finishedAtIso).getTime();
+  const diffSec = Math.max(0, Math.round((endMs - startMs) / 1000));
+  const mins = Math.floor(diffSec / 60);
+  const secs = diffSec % 60;
+
+  if (mins === 0) {
+    return { label: `< 1 Menit (${secs} Detik)`, totalMinutes: 0 };
+  }
+  return { label: `${mins} Menit ${secs} Detik`, totalMinutes: mins };
 }
 
 export function ResultView({
@@ -63,10 +83,11 @@ export function ResultView({
   }, []);
 
   const finishedDate = new Date(finishedAtIso);
-  const hh = String(finishedDate.getHours()).padStart(2, '0');
-  const mm = String(finishedDate.getMinutes()).padStart(2, '0');
   const dateStr = `${finishedDate.getDate()}/${finishedDate.getMonth() + 1}/${finishedDate.getFullYear()}`;
-  const timeDisplay = `${hh}:${mm} WIB (${dateStr})`;
+  const startTimeStr = formatWibSeconds(session.startedAt);
+  const finishTimeStr = formatWibSeconds(finishedAtIso);
+  const durationInfo = formatLockedDuration(session.startedAt, finishedAtIso);
+  const isVeryShortSession = durationInfo.totalMinutes < 5;
 
   const isClean = strikeCount === 0;
 
@@ -93,9 +114,42 @@ export function ResultView({
                 BUKTI RESMI SELESAI
               </span>
             </div>
-            <span className="rounded-sm bg-brand-surface px-2 py-0.5 text-[10px] font-bold text-brand tabular-nums">
-              {liveClock}
-            </span>
+            <div className="inline-flex items-center gap-1.5 rounded-sm bg-brand-surface px-2 py-0.5 text-[10px] font-bold text-brand tabular-nums">
+              <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" aria-hidden="true" />
+              <span>LIVE {liveClock}</span>
+            </div>
+          </div>
+
+          {/* Kotak Bukti Durasi Terkunci (Anti-Incognito & Anti-Reset Tengah Ujian) */}
+          <div className="mt-3.5 rounded-md border border-border bg-bg p-3">
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <span className="flex items-center gap-1.5 font-semibold text-text-secondary">
+                <Timer className="h-3.5 w-3.5 text-brand" aria-hidden="true" />
+                <span>Total Durasi Terkunci</span>
+              </span>
+              <span
+                data-testid="locked-duration-value"
+                className={`font-bold tabular-nums ${
+                  isVeryShortSession ? 'text-warning' : 'text-text-primary'
+                }`}
+              >
+                {durationInfo.label}
+              </span>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 border-t border-border pt-2 text-[11px]">
+              <div>
+                <span className="block text-text-secondary">Waktu Mulai</span>
+                <span className="font-semibold text-text-primary tabular-nums">
+                  {startTimeStr}
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="block text-text-secondary">Waktu Selesai</span>
+                <span className="font-semibold text-text-primary tabular-nums">
+                  {finishTimeStr}
+                </span>
+              </div>
+            </div>
           </div>
 
           <hr className="my-3.5 border-border" />
@@ -124,10 +178,10 @@ export function ResultView({
             <div className="flex items-center justify-between gap-3">
               <dt className="flex items-center gap-2 text-text-secondary">
                 <Clock className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>Waktu Submit</span>
+                <span>Tanggal Ujian</span>
               </dt>
               <dd className="text-right font-semibold text-text-primary tabular-nums">
-                {timeDisplay}
+                {dateStr}
               </dd>
             </div>
 

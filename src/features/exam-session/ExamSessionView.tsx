@@ -272,6 +272,15 @@ export function ExamSessionView({
         )}
       </main>
 
+      {/* Bingkai Merah 4-Sisi Pengawas Jarak Jauh saat tercatat pelanggaran (Proctor Sightline Beacon) */}
+      {lockdown.strikeCount > 0 && (
+        <div
+          aria-hidden="true"
+          data-testid="proctor-sightline-border"
+          className="pointer-events-none fixed inset-0 z-30 border-4 border-[#C62828]"
+        />
+      )}
+
       {/* Dialog Peringatan Tombol Back (Dilarang Keluar! + Sirine 15 Detik) */}
       {isBackDialogOpen && (
         <div
