@@ -11,10 +11,11 @@ import {
   toEmbedGoogleFormUrl,
   validateAndNormalizeExamUrl,
 } from '@/core/url/examUrl';
-import { isWindowWidthUnshrunk } from '@/features/lockdown/screenCheck';
+import { isWindowHeightUnshrunk, isWindowWidthUnshrunk } from '@/features/lockdown/screenCheck';
 import {
   clearPersistedExamState,
   loadPersistedExamState,
+  loadPersistedExamStateAsync,
   savePersistedExamState,
 } from '@/features/lockdown/sessionPersistence';
 
@@ -67,10 +68,17 @@ describe('Deteksi Split-Screen / Floating Window (Ambang 88% Mobile / 45% Deskto
     expect(isWindowWidthUnshrunk(390, 412)).toBe(true);
   });
 
-  it('mendeteksi split-screen jika lebar jendela menyusut di bawah ambang', () => {
+  it('mendeteksi split-screen horizontal jika lebar jendela menyusut di bawah ambang', () => {
     expect(isWindowWidthUnshrunk(500, 1440)).toBe(false);
     expect(isWindowWidthUnshrunk(360, 720)).toBe(false);
     expect(isWindowWidthUnshrunk(280, 412)).toBe(false);
+  });
+
+  it('mendeteksi split-screen vertikal (atas-bawah) khusus perangkat mobile/tablet', () => {
+    expect(isWindowHeightUnshrunk(800, 844, 390)).toBe(true);
+    expect(isWindowHeightUnshrunk(420, 844, 390)).toBe(false);
+    // Layar desktop lebar (> 1024px) tidak terkena false-positive tinggi
+    expect(isWindowHeightUnshrunk(720, 1440, 1920)).toBe(true);
   });
 });
 
@@ -109,7 +117,7 @@ describe('Persistensi Anti-Refresh & Ambang Hard Lock', () => {
     expect(EXAM_METRICS.BRIEF_EXCUSED_SECONDS).toBe(0);
   });
 
-  it('memvalidasi struktur PersistedExamState secara ketat dengan Zod dan aman dipanggil di SSR/Node', () => {
+  it('memvalidasi struktur PersistedExamState secara ketat dengan Zod dan aman dipanggil di SSR/Node', async () => {
     const valid = PersistedExamStateSchema.safeParse({
       session: {
         sessionId: 'ses_123',
@@ -141,6 +149,7 @@ describe('Persistensi Anti-Refresh & Ambang Hard Lock', () => {
     // Pastikan helper storage aman dipanggil di environment Node tanpa window
     savePersistedExamState(valid.data!);
     expect(loadPersistedExamState()).toBeNull();
+    expect(await loadPersistedExamStateAsync()).toBeNull();
     clearPersistedExamState();
   });
 });

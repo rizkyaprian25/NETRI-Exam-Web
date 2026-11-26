@@ -60,7 +60,21 @@ export function isWindowWidthUnshrunk(
 }
 
 /**
- * Memeriksa apakah layar browser bersih dari mode Split-Screen atau Floating Window.
+ * Mendeteksi split-screen vertikal (atas-bawah) pada layar mobile/tablet (<= 1024px)
+ * memakai perbandingan outerHeight terhadap screen.height agar tidak terpicu oleh keyboard virtual.
+ */
+export function isWindowHeightUnshrunk(
+  outerHeight: number,
+  screenHeight: number,
+  availWidth: number,
+): boolean {
+  if (availWidth <= 0 || availWidth > 1024) return true;
+  if (outerHeight <= 0 || screenHeight <= 0) return true;
+  return outerHeight >= screenHeight * EXAM_METRICS.MIN_MOBILE_HEIGHT_RATIO;
+}
+
+/**
+ * Memeriksa apakah layar browser bersih dari mode Split-Screen (horizontal & vertikal) atau Floating Window.
  * Menghormati hook pengujian __NETRI_TEST_SCREEN_CLEAR__ untuk uji E2E 4 gerbang.
  */
 export function checkScreenClear(): boolean {
@@ -82,8 +96,13 @@ export function checkScreenClear(): boolean {
     window.innerWidth > 0 && availWidth > 0
       ? isWindowWidthUnshrunk(window.innerWidth, availWidth)
       : true;
+  const heightOk = isWindowHeightUnshrunk(
+    window.outerHeight,
+    window.screen?.height || 0,
+    availWidth,
+  );
 
-  return outerOk && innerOk;
+  return outerOk && innerOk && heightOk;
 }
 
 /** Memeriksa apakah browser mendukung Fullscreen API (iOS Safari tab biasa mengembalikan false) */

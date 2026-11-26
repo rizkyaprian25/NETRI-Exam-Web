@@ -137,9 +137,17 @@ export function LockScreenDialog({
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="lock-dialog-title"
-      className="exam-no-select fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-bg p-5"
+      className={`exam-no-select fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-bg p-5 ${
+        isHardLocked ? 'proctor-beacon-border' : ''
+      }`}
     >
       <div className="w-full max-w-[440px] text-center">
+        {isHardLocked && (
+          <div className="mb-4 rounded-md bg-[#C62828] px-4 py-2.5 text-xs font-extrabold tracking-wide text-white uppercase shadow-sm">
+            PANGGIL PENGAWAS RUANG — SESI TERKUNCI
+          </div>
+        )}
+
         {/* Ikon Peringatan atau Kunci Permanen */}
         <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-red-500/10 text-danger">
           {isHardLocked ? (

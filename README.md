@@ -11,13 +11,13 @@ Pembungkus ujian terkunci (*secure exam wrapper*) berbasis web untuk **Google Fo
 - **Installable PWA 1-Tap (`sw.js` + `manifest.json`):** Dapat dipasang ke Layar Utama Android, Desktop Chrome/Edge, maupun iPhone (*Tambah ke Layar Utama* Safari) dengan ukuran sangat ringan. Saat dibuka lewat ikon PWA (*Standalone Mode*), address bar & tab browser hilang total **tanpa memicu notifikasi Chrome/Android *"Untuk keluar dari layar penuh, tarik dari bagian bawah/atas"*** karena aplikasi tidak memanggil `Fullscreen API` tambahan.
 - **Input Link & Validasi Domain Ketat:** Mendukung Google Forms (`docs.google.com/forms`, `forms.gle`), otomatis mengubah `/edit` menjadi `/viewform?embedded=true`, dan menerima tautan pendek (`s.id`, `gg.gg`, `bit.ly`) sambil menolak situs di luar domain resmi.
 - **Pemindai QR Code Kamera Langsung:** Memindai QR Code soal dari pengawas via kamera WebRTC (dilengkapi kontrol senter jika perangkat mendukung, putar kamera, serta unggah gambar QR dari galeri).
-- **4 Gerbang Anti-Split-Screen:** Menolak memulai ujian apabila jendela diperkecil (*Split-Screen* / *Floating Window*) dan membunyikan peringatan bila jendela disandingkan dengan aplikasi lain di tengah ujian.
-- **Eskalasi Hard Lock Pengawas pada Strike ke-2:**
-  - **Strike ke-1:** Sirine darurat 15 detik (`600–1400 Hz`), layar peringatan terkunci 5 detik sebelum siswa bisa kembali, serta badge merah pelanggaran di `ExamBar`.
-  - **Strike ke-2:** **Hard Lock Permanen** — siswa tidak bisa kembali ke soal sebelum Pengawas Ruang memasukkan 6-digit kode pembuka kunci.
-- **Anti-Refresh Bypass (`localStorage`):** Jumlah Strike, total detik keluar, status Hard Lock, dan riwayat waktu pelanggaran tersimpan persisten sehingga menekan *Refresh (`F5`)* tidak akan menghapus pelanggaran maupun membuka kunci.
+- **4 Gerbang Anti-Split-Screen (Horizontal & Vertikal) & Anti Pull-to-Refresh:** Menolak memulai ujian apabila jendela diperkecil (*Split-Screen* kiri-kanan maupun atas-bawah HP) serta memblokir gestur tarik-ke-bawah (*overscroll-behavior: none*) agar jawaban tidak hilang.
+- **Eskalasi Hard Lock Pengawas & Proctor Sightline Visual Beacon:**
+  - **Strike ke-1:** Sirine darurat 15 detik (`600–1400 Hz`), layar peringatan terkunci 5 detik, `ExamBar` berubah merah terang disertai bingkai merah 4-sisi layar agar terlihat pengawas dari jauh walau volume HP di-silent.
+  - **Strike ke-2:** **Hard Lock Permanen** dengan bingkai merah berdenyut (`PANGGIL PENGAWAS RUANG`) — siswa tidak bisa kembali sebelum Pengawas memasukkan 6-digit kode pembuka kunci.
+- **Dual-Persistence Anti-Reset (`localStorage` + `IndexedDB`):** Jumlah Strike, total detik keluar, status Hard Lock, dan riwayat waktu pelanggaran dicerminkan ganda ke `localStorage` dan `IndexedDB`, sehingga *Refresh (`F5`)* maupun penghapusan `localStorage` tidak melepas kunci.
 - **Deteksi Multi-Tab (`BroadcastChannel`), Auto-Blur Shield, & Anti-Print:** Membuka tab kedua langsung tercatat, jendela soal otomatis diburamkan seketika saat kehilangan fokus di luar kotak soal, clipboard dibersihkan, serta hasil *Print/PDF* disembunyikan (`@media print`).
-- **Tiled Diagonal Watermark & Audit Trail `ReceiptCard`:** Seluruh layar soal dilapisi watermark diagonal transparan (`ID Sesi + Jam Detik WIB`), dan Kartu Bukti Selesai menampilkan jam detik berjalan secara *real-time*, status integritas (`BERSIH` vs `Tercatat X Pelanggaran`), serta riwayat jam setiap pelanggaran.
+- **Tiled Diagonal Watermark & Bukti Durasi Terkunci `ReceiptCard`:** Seluruh layar soal dilapisi watermark diagonal transparan (`ID Sesi + Jam Detik WIB`), dan Kartu Bukti Selesai menampilkan jam detik live, **Waktu Mulai**, **Waktu Selesai**, **Total Durasi Terkunci** (anti-Incognito/reset tengah ujian), status integritas, serta riwayat jam setiap pelanggaran.
 
 ---
 
