@@ -112,14 +112,20 @@ export function isAllowedFinalExamUrl(rawUrl: string): boolean {
   return matchesAllowedDomain(host, ALLOWED_FINAL_EXAM_HOSTS);
 }
 
-/** Menambahkan ?embedded=true ke URL Google Forms tanpa merusak parameter pre-fill NIS */
+/**
+ * Mengonversi tautan Google Forms (/edit -> /viewform) dan menambahkan ?embedded=true
+ * tanpa merusak parameter pre-fill NIS (entry.xxx) yang sudah ada.
+ */
 export function toEmbedGoogleFormUrl(rawUrl: string): string {
   try {
     const parsed = new URL(rawUrl);
     const host = parsed.hostname.toLowerCase();
-    const path = parsed.pathname.toLowerCase();
+    const pathLower = parsed.pathname.toLowerCase();
 
-    if (host === 'docs.google.com' && path.startsWith('/forms')) {
+    if (host === 'docs.google.com' && pathLower.startsWith('/forms')) {
+      if (/\/edit\/?$/i.test(parsed.pathname)) {
+        parsed.pathname = parsed.pathname.replace(/\/edit\/?$/i, '/viewform');
+      }
       if (!parsed.searchParams.has('embedded')) {
         parsed.searchParams.set('embedded', 'true');
       }

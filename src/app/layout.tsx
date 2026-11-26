@@ -1,13 +1,15 @@
 import type { Metadata, Viewport } from 'next';
+import { withBasePath } from '@/core/url/basePath';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Exam NETRI — Aplikasi Ujian Aman (Web)',
   description:
     'Platform ujian terkunci berbasis web untuk Google Forms tanpa perlu mengunduh aplikasi, lengkap dengan deteksi keluar layar dan sirine pengawas.',
+  manifest: withBasePath('/manifest.json'),
   icons: {
-    icon: '/favicon.png',
-    apple: '/icons/Icon-192.png',
+    icon: withBasePath('/favicon.png'),
+    apple: withBasePath('/icons/Icon-192.png'),
   },
   appleWebApp: {
     capable: true,

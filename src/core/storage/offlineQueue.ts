@@ -1,18 +1,42 @@
-// Antrean Pelanggaran Offline (Fail-Open Resilience dengan Exponential Backoff + Jitter)
-// Mereplikasi langsung mekanisme OfflineViolationQueue pada aplikasi mobile Flutter
+// Antrean Pelanggaran Offline & Jejak Audit Lokal (Fail-Open Resilience)
+// Menyimpan seluruh pelanggaran secara lokal di browser dan mengirim ke webhook opsional dengan Exponential Backoff + Jitter
 
 import type { ViolationEventModel } from '@/contracts/exam';
 
 const STORAGE_KEY = 'netri_offline_violation_queue_v1';
+const AUDIT_LOG_KEY = 'netri_recorded_violations_v1';
 const BASE_RETRY_DELAY_MS = 500;
 const MAX_RETRY_DELAY_MS = 8000;
 const MAX_JITTER_MS = 200;
 
 export type SendViolationFn = (event: ViolationEventModel) => Promise<boolean>;
 
-async function defaultPostViolation(event: ViolationEventModel): Promise<boolean> {
+function appendAuditHistory(event: ViolationEventModel): void {
+  if (typeof window === 'undefined') return;
   try {
-    const response = await fetch('/api/session/violations', {
+    const raw = window.localStorage.getItem(AUDIT_LOG_KEY);
+    const list: ViolationEventModel[] = raw ? (JSON.parse(raw) as ViolationEventModel[]) : [];
+    const exists = list.some((item) => item.id === event.id);
+    if (!exists) {
+      list.push(event);
+      window.localStorage.setItem(AUDIT_LOG_KEY, JSON.stringify(list.slice(-200)));
+    }
+  } catch {
+    // Abaikan jika localStorage penuh
+  }
+}
+
+async function defaultPostViolation(event: ViolationEventModel): Promise<boolean> {
+  appendAuditHistory(event);
+
+  const webhookUrl = process.env.NEXT_PUBLIC_VIOLATION_WEBHOOK_URL?.trim();
+  if (!webhookUrl) {
+    // Pada mode statis murni GitHub Pages tanpa webhook eksternal, event tercatat aman di audit lokal
+    return true;
+  }
+
+  try {
+    const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(event),

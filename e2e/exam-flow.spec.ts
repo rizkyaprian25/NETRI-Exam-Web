@@ -4,20 +4,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
 async function mockResolveToLocalForm(page: Page) {
-  await page.route('**/api/resolve-form', async (route) => {
-    const requestBody = route.request().postDataJSON() as { url?: string };
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        success: true,
-        data: {
-          normalizedUrl: requestBody.url || 'https://forms.gle/sampleExamNetri123',
-          embedUrl: '/mock-form',
-          examTitle: 'Penilaian Akhir Semester - Matematika XII',
-        },
-      }),
-    });
+  await page.addInitScript(() => {
+    window.__NETRI_MOCK_ONLINE__ = true;
+    window.__NETRI_MOCK_EMBED_URL__ = '/mock-form/';
   });
 }
 
@@ -95,7 +84,7 @@ test.describe('Alur Lengkap E2E NETRI Exam Web (Paritas 1:1 Mobile)', () => {
 
     await expect(page.getByText('Sesi Ujian Selesai')).toBeVisible();
     await expect(page.getByText('BUKTI RESMI SELESAI')).toBeVisible();
-    await expect(page.getByText('Penilaian Akhir Semester - Matematika XII')).toBeVisible();
+    await expect(page.getByText('Ujian Google Form')).toBeVisible();
 
     // Kembali ke beranda bersih
     await page.getByRole('button', { name: 'Kembali ke Beranda' }).click();

@@ -34,12 +34,17 @@ describe('Validasi & Normalisasi Tautan Ujian', () => {
     expect(isAllowedFinalExamUrl('https://chatgpt.com')).toBe(false);
   });
 
-  it('menambahkan ?embedded=true tanpa menghapus parameter pre-fill NIS', () => {
+  it('menambahkan ?embedded=true tanpa menghapus parameter pre-fill NIS dan mengonversi /edit ke /viewform', () => {
     const prefilled =
       'https://docs.google.com/forms/d/e/1FAIpQLScX/viewform?usp=pp_url&entry.123=102938';
     const result = toEmbedGoogleFormUrl(prefilled);
     expect(result).toContain('entry.123=102938');
     expect(result).toContain('embedded=true');
+
+    const editLink = 'https://docs.google.com/forms/d/1AbCdEf/edit';
+    expect(toEmbedGoogleFormUrl(editLink)).toBe(
+      'https://docs.google.com/forms/d/1AbCdEf/viewform?embedded=true',
+    );
   });
 
   it('mengekstrak judul formulir bersih dari HTML Google Form', () => {
@@ -62,33 +67,33 @@ describe('Deteksi Split-Screen / Floating Window (Ambang 88% Mobile / 45% Deskto
   });
 });
 
-describe('EmergencyVerifier (Constant-Time SHA-256 & Anti Brute-Force)', () => {
-  it('menerima kode 202627 dan mengunci 30 detik setelah 5 kali percobaan salah', () => {
+describe('EmergencyVerifier (Web Crypto SHA-256 & Anti Brute-Force)', () => {
+  it('menerima kode pengawas sah dan mengunci 30 detik setelah 5 kali percobaan salah', async () => {
     const verifier = new EmergencyVerifier();
     const clientKey = '127.0.0.1:ses_test_1';
     const baseTime = 1_700_000_000_000;
 
     // 4 kali salah pertama mengembalikan sisa percobaan 4 -> 1
     for (let attempt = 1; attempt <= 4; attempt += 1) {
-      const res = verifier.verify('111111', clientKey, baseTime + attempt * 100);
+      const res = await verifier.verify('111111', clientKey, baseTime + attempt * 100);
       expect(res.verified).toBe(false);
       expect(res.lockedOut).toBe(false);
       expect(res.remainingAttempts).toBe(5 - attempt);
     }
 
     // Kesalahan ke-5 langsung memicu lockout 30 detik
-    const fifth = verifier.verify('111111', clientKey, baseTime + 500);
+    const fifth = await verifier.verify('111111', clientKey, baseTime + 500);
     expect(fifth.verified).toBe(false);
     expect(fifth.lockedOut).toBe(true);
     expect(fifth.remainingLockoutSeconds).toBe(30);
 
     // Selama lockout 30 detik, bahkan kode benar ditolak sampai cooldown habis
-    const duringLock = verifier.verify('202627', clientKey, baseTime + 10_000);
+    const duringLock = await verifier.verify('202627', clientKey, baseTime + 10_000);
     expect(duringLock.verified).toBe(false);
     expect(duringLock.lockedOut).toBe(true);
 
-    // Setelah 31 detik, kode 202627 berhasil diverifikasi
-    const afterCooldown = verifier.verify('202627', clientKey, baseTime + 31_000);
+    // Setelah 31 detik, kode sah berhasil diverifikasi
+    const afterCooldown = await verifier.verify('202627', clientKey, baseTime + 31_000);
     expect(afterCooldown.verified).toBe(true);
     expect(afterCooldown.lockedOut).toBe(false);
   });
