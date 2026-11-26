@@ -18,9 +18,10 @@ import {
 } from 'lucide-react';
 import type {
   ActiveExamSession,
-  ApiResponse,
   ResolveFormData,
 } from '@/contracts/exam';
+import { resolveExamFormClient } from '@/core/network/examClient';
+import { withBasePath } from '@/core/url/basePath';
 import { validateAndNormalizeExamUrl } from '@/core/url/examUrl';
 import {
   checkScreenClear,
@@ -121,23 +122,14 @@ export function LoginView({ onStartExam }: LoginViewProps) {
     setErrorMessage(null);
 
     try {
-      // Resolusi shortlink & verifikasi koneksi internet nyata Hotspot di sisi server
-      const response = await fetch('/api/resolve-form', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: normalizedLocal }),
-      });
-
-      const json = (await response.json()) as ApiResponse<ResolveFormData>;
-      if (!response.ok || !json.success || !json.data) {
-        setErrorMessage(
-          json.error?.message ||
-            'Gagal memverifikasi tautan ujian. Pastikan koneksi internet aktif.',
-        );
+      // Validasi tautan dan cek keterjangkauan internet nyata Hotspot secara client-native
+      const resolved = await resolveExamFormClient(normalizedLocal);
+      if (!resolved.ok) {
+        setErrorMessage(resolved.message);
         return;
       }
 
-      setPendingFormData(json.data);
+      setPendingFormData(resolved.data);
       setIsConfirmSheetOpen(true);
     } catch {
       setErrorMessage(
@@ -202,7 +194,7 @@ export function LoginView({ onStartExam }: LoginViewProps) {
         {/* Header Logo Resmi */}
         <div className="flex flex-col items-center">
           <Image
-            src="/images/logo.png"
+            src={withBasePath('/images/logo.png')}
             alt="Logo NETRI Exam"
             width={200}
             height={96}

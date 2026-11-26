@@ -16,6 +16,7 @@ import {
   type ActiveExamSession,
   type ConnectionStatus,
 } from '@/contracts/exam';
+import { checkInternetReachability } from '@/core/network/examClient';
 import { EmergencyExitDialog } from '@/features/lockdown/EmergencyExitDialog';
 import { sharedSirenAudio } from '@/features/lockdown/sirenAudio';
 import { useLockdownEngine } from '@/features/lockdown/useLockdownEngine';
@@ -64,19 +65,12 @@ export function ExamSessionView({
 
   const checkHeartbeatNow = useCallback(async () => {
     try {
-      const response = await fetch('/api/session/heartbeat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: session.sessionId,
-          isFullscreen: lockdown.isFullscreenOk,
-        }),
-      });
-      setConnectionStatus(response.ok ? 'connected' : 'reconnecting');
+      const reachable = await checkInternetReachability();
+      setConnectionStatus(reachable ? 'connected' : 'offline');
     } catch {
       setConnectionStatus('offline');
     }
-  }, [lockdown.isFullscreenOk, session.sessionId]);
+  }, []);
 
   const startWatchdog = useCallback(() => {
     clearWatchdog();
@@ -94,13 +88,23 @@ export function ExamSessionView({
     return () => clearWatchdog();
   }, [reloadNonce, startWatchdog, clearWatchdog]);
 
-  // Heartbeat periodik tiap 20 detik (1:1 dengan versi Mobile)
+  // Heartbeat periodik tiap 20 detik & listener status online/offline browser
   useEffect(() => {
+    const handleOnline = () => void checkHeartbeatNow();
+    const handleOffline = () => setConnectionStatus('offline');
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
     const interval = window.setInterval(() => {
       void checkHeartbeatNow();
     }, EXAM_METRICS.HEARTBEAT_INTERVAL_MS);
 
-    return () => window.clearInterval(interval);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      window.clearInterval(interval);
+    };
   }, [checkHeartbeatNow]);
 
   const handleIframeLoad = () => {

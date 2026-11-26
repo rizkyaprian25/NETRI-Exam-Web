@@ -4,6 +4,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import { withBasePath } from '@/core/url/basePath';
 
 function MockFormContent() {
   const searchParams = useSearchParams();
@@ -36,7 +37,7 @@ function MockFormContent() {
           className="mt-3 w-full rounded border border-slate-300 px-3 py-2 text-sm"
         />
         <a
-          href="/mock-form?submitted=1"
+          href={withBasePath('/mock-form/?submitted=1')}
           className="mt-4 inline-block rounded bg-blue-600 px-4 py-2 text-sm font-semibold text-white"
         >
           Kirim Jawaban

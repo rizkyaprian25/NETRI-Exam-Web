@@ -1,11 +1,11 @@
 'use client';
 
 // Dialog Verifikasi Kode Keluar Darurat Pengawas (1:1 dengan emergency_exit_guard.dart)
-// Verifikasi dijalankan di sisi server via /api/verify-emergency (aman dari Inspect Element)
+// Verifikasi dijalankan secara waktu konstan menggunakan Web Crypto SHA-256 + anti brute-force persisten
 
 import { useEffect, useState } from 'react';
 import { KeyRound, LockOpen, ShieldAlert } from 'lucide-react';
-import type { ApiResponse, VerifyEmergencyData } from '@/contracts/exam';
+import { sharedEmergencyVerifier } from '@/core/security/emergencyVerifier';
 
 interface EmergencyExitDialogProps {
   isOpen: boolean;
@@ -32,7 +32,19 @@ export function EmergencyExitDialog({
       setIsSubmitting(false);
       return;
     }
-  }, [isOpen]);
+
+    // Sinkronkan status lockout saat dialog dibuka agar tidak bisa direset dengan menutup dialog
+    const status = sharedEmergencyVerifier.getLockoutStatus(sessionId);
+    if (status.lockedOut) {
+      setLockoutSeconds(status.remainingLockoutSeconds);
+      setErrorText(
+        `Terlalu banyak percobaan salah. Coba lagi dalam ${status.remainingLockoutSeconds} detik.`,
+      );
+    } else {
+      setLockoutSeconds(0);
+      setErrorText(null);
+    }
+  }, [isOpen, sessionId]);
 
   useEffect(() => {
     if (lockoutSeconds <= 0) return;
@@ -72,31 +84,23 @@ export function EmergencyExitDialog({
     setErrorText(null);
 
     try {
-      const response = await fetch('/api/verify-emergency', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ passcode: cleaned, sessionId }),
-      });
-
-      const json = (await response.json()) as ApiResponse<VerifyEmergencyData>;
-      if (json.success && json.data?.verified) {
+      const result = await sharedEmergencyVerifier.verify(cleaned, sessionId);
+      if (result.verified) {
         onVerified();
         return;
       }
 
-      if (json.data?.lockedOut) {
-        const secs = json.data.remainingLockoutSeconds || 30;
+      if (result.lockedOut) {
+        const secs = result.remainingLockoutSeconds || 30;
         setLockoutSeconds(secs);
         setErrorText(`Terlalu banyak percobaan salah. Coba lagi dalam ${secs} detik.`);
-      } else if (json.data) {
-        setErrorText(
-          `Kode darurat salah. Sisa percobaan: ${json.data.remainingAttempts} kali.`,
-        );
       } else {
-        setErrorText(json.error?.message || 'Kode darurat tidak valid.');
+        setErrorText(
+          `Kode darurat salah. Sisa percobaan: ${result.remainingAttempts} kali.`,
+        );
       }
     } catch {
-      setErrorText('Gagal terhubung ke server verifikasi pengawas. Coba lagi.');
+      setErrorText('Gagal memverifikasi kode pengawas. Coba lagi.');
     } finally {
       setIsSubmitting(false);
     }

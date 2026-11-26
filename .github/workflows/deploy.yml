@@ -1,0 +1,49 @@
+# Workflow otomatisasi build static export dan deploy NETRI Exam Web ke GitHub Pages
+name: Deploy NETRI Exam Web to GitHub Pages
+
+on:
+  push:
+    branches:
+      - staging
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: 'gh-pages-deploy'
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Instalasi dependensi
+        run: npm ci
+
+      - name: Validasi TypeScript & Unit Test
+        run: |
+          npm run typecheck
+          npm run test
+
+      - name: Build Static Export untuk GitHub Pages
+        env:
+          NEXT_PUBLIC_BASE_PATH: /NETRI-Exam-Web
+        run: npm run build
+
+      - name: Deploy artefak out/ ke branch gh-pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: out
+          branch: gh-pages
