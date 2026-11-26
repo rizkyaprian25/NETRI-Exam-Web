@@ -26,9 +26,11 @@ import { validateAndNormalizeExamUrl } from '@/core/url/examUrl';
 import {
   checkScreenClear,
   isFullscreenSupported,
+  isStandalonePwa,
   requestExamFullscreen,
 } from '@/features/lockdown/screenCheck';
 import { sharedSirenAudio } from '@/features/lockdown/sirenAudio';
+import { PwaInstallBanner } from '@/features/pwa/PwaInstallBanner';
 import { QrScannerModal } from '@/features/qr-scanner/QrScannerModal';
 
 const FLOATING_APP_ERROR =
@@ -151,8 +153,11 @@ export function LoginView({ onStartExam }: LoginViewProps) {
     // Buka kunci Web Audio API pada event klik langsung pengguna agar sirine 15 detik pasti berbunyi di HP
     await sharedSirenAudio.unlock();
 
-    const fsSupported = isFullscreenSupported();
-    if (fsSupported) {
+    // Jika dibuka dari aplikasi PWA terpasang (Standalone), bar Chrome sudah hilang sehingga tidak memicu notif "tarik layar"
+    const inPwaMode = isStandalonePwa();
+    const shouldUseFullscreen = !inPwaMode && isFullscreenSupported();
+
+    if (shouldUseFullscreen) {
       const enteredFullscreen = await requestExamFullscreen();
       if (!enteredFullscreen) {
         setIsConfirmSheetOpen(false);
@@ -182,9 +187,10 @@ export function LoginView({ onStartExam }: LoginViewProps) {
       embedFormUrl: data.embedUrl,
       examTitle: data.examTitle,
       subject: data.examTitle || 'Ujian Google Form',
-      className: 'Web Kiosk (Umum)',
+      className: inPwaMode ? 'Aplikasi PWA (Terkunci)' : 'Web Browser (Umum)',
       startedAt: now.toISOString(),
-      requiresFullscreen: fsSupported,
+      requiresFullscreen: shouldUseFullscreen,
+      isPwaStandalone: inPwaMode,
     });
   };
 
@@ -281,6 +287,9 @@ export function LoginView({ onStartExam }: LoginViewProps) {
           </form>
         </section>
 
+        {/* Banner Instalasi PWA Ringan (< 500 KB, Tanpa APK) */}
+        <PwaInstallBanner />
+
         {/* Pesan Error */}
         {errorMessage && (
           <div
@@ -335,8 +344,8 @@ export function LoginView({ onStartExam }: LoginViewProps) {
               <p className="font-bold text-text-primary">Peraturan Ujian:</p>
               <ul className="mt-1.5 space-y-1">
                 <li>• Dilarang berpindah tab, mengecilkan jendela, atau membuka aplikasi lain.</li>
-                <li>• Pastikan volume perangkat aktif agar sirine peringatan terdengar jelas.</li>
-                <li>• Mencoba keluar akan membunyikan sirine keras selama 15 detik!</li>
+                <li>• Pelanggaran ke-1 membunyikan sirine keras 15 detik dan tercatat di laporan akhir.</li>
+                <li>• Pelanggaran ke-2 mengunci ujian secara permanen hingga dibuka oleh pengawas.</li>
               </ul>
             </div>
 

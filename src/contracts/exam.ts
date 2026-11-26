@@ -30,7 +30,9 @@ export const EXAM_METRICS = {
   WATCHDOG_TIMEOUT_MS: 15000,
   HEARTBEAT_INTERVAL_MS: 20000,
   STARTUP_GRACE_MS: 5000,
-  BRIEF_EXCUSED_SECONDS: 3,
+  BRIEF_EXCUSED_SECONDS: 0,
+  HARD_LOCK_STRIKE_THRESHOLD: 2,
+  STRIKE_COOLDOWN_SECONDS: 5,
   MIN_SCREEN_WIDTH_RATIO: 0.88,
   MAX_EMERGENCY_ATTEMPTS: 5,
   EMERGENCY_LOCKOUT_SECONDS: 30,
@@ -46,6 +48,7 @@ export const ViolationTypeSchema = z.enum([
   'fullscreen_exit',
   'external_navigation',
   'back_button',
+  'multi_tab',
 ]);
 
 export type ViolationType = z.infer<typeof ViolationTypeSchema>;
@@ -70,15 +73,37 @@ export type ViolationEventModel = z.infer<typeof ViolationEventSchema>;
 export const ActiveExamSessionSchema = z.object({
   sessionId: z.string().min(1),
   rawInputUrl: z.string().url(),
-  embedFormUrl: z.string().url(),
+  embedFormUrl: z.string().min(1),
   examTitle: z.string().min(1),
   subject: z.string().min(1),
   className: z.string().min(1),
   startedAt: z.string().min(1),
   requiresFullscreen: z.boolean(),
+  isPwaStandalone: z.boolean().default(false),
 });
 
 export type ActiveExamSession = z.infer<typeof ActiveExamSessionSchema>;
+
+export const ViolationLogEntrySchema = z.object({
+  id: z.string().min(1),
+  type: ViolationTypeSchema,
+  timestamp: z.string().min(1),
+  durationSeconds: z.number().int().min(0).optional(),
+  notes: z.string().min(1).max(500),
+});
+
+export type ViolationLogEntry = z.infer<typeof ViolationLogEntrySchema>;
+
+export const PersistedExamStateSchema = z.object({
+  session: ActiveExamSessionSchema,
+  strikeCount: z.number().int().min(0),
+  totalAwaySeconds: z.number().int().min(0),
+  isHardLocked: z.boolean(),
+  lastLockReason: z.string(),
+  violationLogs: z.array(ViolationLogEntrySchema),
+});
+
+export type PersistedExamState = z.infer<typeof PersistedExamStateSchema>;
 
 export const ResolveFormRequestSchema = z.object({
   url: z.string().trim().min(1, 'Tautan formulir tidak boleh kosong.').max(2048),

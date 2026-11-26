@@ -1,35 +1,69 @@
 'use client';
 
 // Root State Machine In-Page NETRI Exam Web
-// Mengelola alur Login -> ExamSession -> Result tanpa reload dokumen agar Fullscreen Lock tetap terjaga
+// Mengelola alur Login -> ExamSession -> Result serta memulihkan sesi & Hard Lock jika browser di-refresh (F5)
 
-import { useState } from 'react';
-import type { ActiveExamSession } from '@/contracts/exam';
+import { useEffect, useState } from 'react';
+import type {
+  ActiveExamSession,
+  PersistedExamState,
+  ViolationLogEntry,
+} from '@/contracts/exam';
 import { LoginView } from '@/features/auth/LoginView';
 import { ExamSessionView } from '@/features/exam-session/ExamSessionView';
+import {
+  clearPersistedExamState,
+  loadPersistedExamState,
+} from '@/features/lockdown/sessionPersistence';
 import { ResultView } from '@/features/result/ResultView';
 
 type AppStage =
   | { kind: 'login' }
-  | { kind: 'exam'; session: ActiveExamSession }
-  | { kind: 'result'; session: ActiveExamSession; strikeCount: number; finishedAtIso: string };
+  | { kind: 'exam'; session: ActiveExamSession; initialPersisted?: PersistedExamState }
+  | {
+      kind: 'result';
+      session: ActiveExamSession;
+      strikeCount: number;
+      totalAwaySeconds: number;
+      violationLogs: ViolationLogEntry[];
+      finishedAtIso: string;
+    };
 
 export default function HomePage() {
   const [stage, setStage] = useState<AppStage>({ kind: 'login' });
+
+  // Anti-Refresh Bypass: Jika ada sesi ujian aktif atau Hard Lock tersimpan, pulihkan langsung saat mount
+  useEffect(() => {
+    const persisted = loadPersistedExamState();
+    if (persisted) {
+      setStage({
+        kind: 'exam',
+        session: persisted.session,
+        initialPersisted: persisted,
+      });
+    }
+  }, []);
 
   if (stage.kind === 'exam') {
     return (
       <ExamSessionView
         session={stage.session}
-        onCompleted={(strikeCount) =>
+        initialPersisted={stage.initialPersisted}
+        onCompleted={({ strikeCount, totalAwaySeconds, violationLogs }) => {
+          clearPersistedExamState();
           setStage({
             kind: 'result',
             session: stage.session,
             strikeCount,
+            totalAwaySeconds,
+            violationLogs,
             finishedAtIso: new Date().toISOString(),
-          })
-        }
-        onEmergencyExited={() => setStage({ kind: 'login' })}
+          });
+        }}
+        onEmergencyExited={() => {
+          clearPersistedExamState();
+          setStage({ kind: 'login' });
+        }}
       />
     );
   }
@@ -39,6 +73,8 @@ export default function HomePage() {
       <ResultView
         session={stage.session}
         strikeCount={stage.strikeCount}
+        totalAwaySeconds={stage.totalAwaySeconds}
+        violationLogs={stage.violationLogs}
         finishedAtIso={stage.finishedAtIso}
         onReturnHome={() => setStage({ kind: 'login' })}
       />

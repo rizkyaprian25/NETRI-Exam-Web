@@ -1,13 +1,15 @@
 'use client';
 
 // ExamBar: Bar Tipis Status Ujian 52px (1:1 dengan exam_bar.dart Mobile)
-// Menampilkan StatusPill koneksi nyata, indikator Exam NETRI (Terkunci), Muat Ulang Soal, dan Keluar Darurat
+// Menampilkan StatusPill koneksi nyata, indikator Exam NETRI (Terkunci), badge pelanggaran mencolok, Muat Ulang Soal, dan Keluar Darurat
 
-import { Lock, RefreshCw, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, Lock, RefreshCw, ShieldAlert } from 'lucide-react';
 import { EXAM_METRICS, type ConnectionStatus } from '@/contracts/exam';
 
 interface ExamBarProps {
   connectionStatus: ConnectionStatus;
+  strikeCount: number;
+  isHardLocked: boolean;
   onReloadForm: () => void;
   onEmergencyExit: () => void;
 }
@@ -35,6 +37,8 @@ const STATUS_DISPLAY: Record<
 
 export function ExamBar({
   connectionStatus,
+  strikeCount,
+  isHardLocked,
   onReloadForm,
   onEmergencyExit,
 }: ExamBarProps) {
@@ -49,20 +53,32 @@ export function ExamBar({
       <div
         role="status"
         aria-live="polite"
-        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${pill.badgeClass}`}
+        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${pill.badgeClass}`}
       >
         <span className={`h-2 w-2 rounded-full ${pill.dotClass}`} aria-hidden="true" />
-        <span>{pill.label}</span>
+        <span className="hidden xs:inline sm:inline">{pill.label}</span>
       </div>
 
-      {/* Indikator Status Ujian Terkunci */}
-      <div className="mx-1.5 flex min-w-0 items-center gap-1.5 rounded-full border border-brand/30 bg-brand-surface px-2.5 py-1 text-xs font-bold text-brand">
-        <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-        <span className="truncate">Exam NETRI (Terkunci)</span>
+      {/* Indikator Status Ujian Terkunci atau Peringatan Pelanggaran */}
+      <div className="mx-1.5 flex min-w-0 items-center gap-1.5">
+        <div className="flex min-w-0 items-center gap-1.5 rounded-full border border-brand/30 bg-brand-surface px-2.5 py-1 text-xs font-bold text-brand">
+          <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span className="truncate">Exam NETRI (Terkunci)</span>
+        </div>
+
+        {strikeCount > 0 && (
+          <div
+            role="status"
+            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-danger px-2.5 py-1 text-[11px] font-bold text-white tabular-nums"
+          >
+            <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />
+            <span>{isHardLocked ? 'TERKUNCI' : `${strikeCount} Pelanggaran`}</span>
+          </div>
+        )}
       </div>
 
       {/* Aksi Muat Ulang Soal & Keluar Darurat Pengawas (area sentuh minimal 44x44px) */}
-      <div className="flex items-center gap-0.5">
+      <div className="flex shrink-0 items-center gap-0.5">
         <button
           type="button"
           onClick={onReloadForm}
