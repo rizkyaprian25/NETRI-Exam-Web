@@ -1,13 +1,14 @@
 'use client';
 
-// Layar Sesi Ujian Terkunci Web (1:1 dengan exam_session_screen.dart)
-// Mengintegrasikan ExamBar 52px, sandboxed Google Form iframe, Audit Watermark halus,
-// Watchdog 15s, Heartbeat 20s, deteksi navigasi submit, dialog Back 15s, dan Lockdown Engine.
+// Layar Sesi Ujian Terkunci Web v2 (1:1 Mobile + Penguatan 9 Lapis Anti-Curang)
+// Mengintegrasikan ExamBar 52px, sandboxed Google Form iframe, Full-Screen Tiled Diagonal Watermark,
+// Auto-Blur Privacy Shield, Watchdog 15s, Heartbeat 20s, deteksi navigasi submit, dan Hard Lock Pengawas.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
+  EyeOff,
   ShieldAlert,
   Volume2,
 } from 'lucide-react';
@@ -15,6 +16,8 @@ import {
   EXAM_METRICS,
   type ActiveExamSession,
   type ConnectionStatus,
+  type PersistedExamState,
+  type ViolationLogEntry,
 } from '@/contracts/exam';
 import { checkInternetReachability } from '@/core/network/examClient';
 import { EmergencyExitDialog } from '@/features/lockdown/EmergencyExitDialog';
@@ -27,12 +30,25 @@ import { SecurityCurtain } from './SecurityCurtain';
 
 interface ExamSessionViewProps {
   session: ActiveExamSession;
-  onCompleted: (strikeCount: number) => void;
+  initialPersisted?: PersistedExamState;
+  onCompleted: (summary: {
+    strikeCount: number;
+    totalAwaySeconds: number;
+    violationLogs: ViolationLogEntry[];
+  }) => void;
   onEmergencyExited: () => void;
+}
+
+function formatWibClock(date: Date): string {
+  const hh = String(date.getHours()).padStart(2, '0');
+  const mm = String(date.getMinutes()).padStart(2, '0');
+  const ss = String(date.getSeconds()).padStart(2, '0');
+  return `${hh}:${mm}:${ss} WIB`;
 }
 
 export function ExamSessionView({
   session,
+  initialPersisted,
   onCompleted,
   onEmergencyExited,
 }: ExamSessionViewProps) {
@@ -42,6 +58,7 @@ export function ExamSessionView({
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>('connected');
   const [reloadNonce, setReloadNonce] = useState(0);
+  const [liveClock, setLiveClock] = useState(() => formatWibClock(new Date()));
 
   const [isBackDialogOpen, setIsBackDialogOpen] = useState(false);
   const [isEmergencyDialogOpen, setIsEmergencyDialogOpen] = useState(false);
@@ -50,11 +67,19 @@ export function ExamSessionView({
   const watchdogRef = useRef<number | null>(null);
 
   const lockdown = useLockdownEngine({
-    sessionId: session.sessionId,
+    session,
     isActive: true,
-    requiresFullscreen: session.requiresFullscreen,
+    initialPersisted,
     onBackAttempt: () => setIsBackDialogOpen(true),
   });
+
+  // Perbarui jam detik untuk watermark anti-screenshot palsu
+  useEffect(() => {
+    const clockTimer = window.setInterval(() => {
+      setLiveClock(formatWibClock(new Date()));
+    }, 1000);
+    return () => window.clearInterval(clockTimer);
+  }, []);
 
   const clearWatchdog = useCallback(() => {
     if (watchdogRef.current !== null) {
@@ -125,7 +150,11 @@ export function ExamSessionView({
 
   const handleCompleteExam = async () => {
     await lockdown.releaseAllLocks();
-    onCompleted(lockdown.strikeCount);
+    onCompleted({
+      strikeCount: lockdown.strikeCount,
+      totalAwaySeconds: lockdown.totalAwaySeconds,
+      violationLogs: lockdown.violationLogs,
+    });
   };
 
   const handleEmergencyVerified = async () => {
@@ -137,10 +166,14 @@ export function ExamSessionView({
   const showSecurityCurtain =
     !lockdown.isScreenClear || (session.requiresFullscreen && !lockdown.isFullscreenOk);
 
+  const watermarkText = `EXAM NETRI • ${session.sessionId} • ${liveClock}`;
+
   return (
     <div className="exam-no-select flex h-dvh w-full flex-col overflow-hidden bg-bg">
       <ExamBar
         connectionStatus={connectionStatus}
+        strikeCount={lockdown.strikeCount}
+        isHardLocked={lockdown.isHardLocked}
         onReloadForm={handleReloadForm}
         onEmergencyExit={() => {
           sharedSirenAudio.stop();
@@ -164,21 +197,46 @@ export function ExamSessionView({
           src={session.embedFormUrl}
           title={session.examTitle || 'Lembar Soal Ujian Google Form'}
           onLoad={handleIframeLoad}
-          // Sandbox memblokir navigasi keluar ke domain lain & mencegah pengubahan halaman induk
           sandbox="allow-forms allow-scripts allow-same-origin"
           referrerPolicy="no-referrer"
-          className="h-full w-full border-0 bg-white"
+          className={`h-full w-full border-0 bg-white transition-[filter] duration-150 ${
+            lockdown.isWindowBlurred || lockdown.isLockedDialogOpen ? 'blur-xl' : ''
+          }`}
         />
 
-        {/* Audit Watermark Transparan Halus (Mitigasi Screenshot OS tanpa mengganggu keterbacaan soal) */}
+        {/* Full-Screen Tiled Diagonal Watermark (Mitigasi Foto HP & Screenshot tanpa menghalangi bacaan) */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-10 flex select-none items-end justify-end p-3"
+          data-testid="exam-tiled-watermark"
+          className="pointer-events-none absolute inset-0 z-10 overflow-hidden select-none"
         >
-          <span className="rounded bg-black/[0.04] px-2 py-0.5 font-mono text-[10px] text-black/25">
-            EXAM NETRI • {session.sessionId}
-          </span>
+          <div className="grid h-[140%] w-[140%] -translate-x-[15%] -translate-y-[15%] -rotate-[24deg] grid-cols-2 sm:grid-cols-3 gap-y-16 gap-x-8 items-center justify-items-center">
+            {Array.from({ length: 12 }).map((_, idx) => (
+              <span
+                key={idx}
+                className="whitespace-nowrap font-mono text-[11px] font-semibold tracking-wider text-slate-900/[0.07]"
+              >
+                {watermarkText}
+              </span>
+            ))}
+          </div>
         </div>
+
+        {/* Auto-Blur Privacy Shield saat jendela kehilangan fokus (di luar iframe) */}
+        {lockdown.isWindowBlurred &&
+          !lockdown.isLockedDialogOpen &&
+          !showSecurityCurtain && (
+            <div
+              role="status"
+              className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-950/65 p-6 text-center text-white backdrop-blur-md"
+            >
+              <EyeOff className="h-10 w-10 text-amber-300" aria-hidden="true" />
+              <p className="mt-3 text-base font-bold">Layar Ujian Dilindungi</p>
+              <p className="mt-1 text-xs text-white/80">
+                Fokus kembali ke jendela ujian untuk melanjutkan melihat soal.
+              </p>
+            </div>
+          )}
 
         {/* Tombol Selesai hanya tampil setelah iframe mengalami navigasi/kirim lanjutan (load >= 2) */}
         {iframeLoadCount >= 2 && !webLoadError && (
@@ -302,12 +360,15 @@ export function ExamSessionView({
         </div>
       )}
 
-      {/* Layar Peringatan Kecurangan (LockScreenDialog) */}
+      {/* Layar Peringatan Kecurangan / Hard Lock Pengawas */}
       <LockScreenDialog
         isOpen={lockdown.isLockedDialogOpen}
+        sessionId={session.sessionId}
         strikeCount={lockdown.strikeCount}
+        isHardLocked={lockdown.isHardLocked}
         reason={lockdown.lockReason}
         onAcknowledge={lockdown.acknowledgeLock}
+        onProctorUnlocked={lockdown.unlockHardLockByProctor}
         onEmergencyExit={() => {
           sharedSirenAudio.stop();
           setIsEmergencyDialogOpen(true);

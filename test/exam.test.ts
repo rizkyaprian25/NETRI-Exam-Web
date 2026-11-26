@@ -1,6 +1,8 @@
-// Unit & Integration Tests untuk Kontrak, URL Guard, Split-Screen Ratio, EmergencyVerifier, & OfflineQueue
+// Unit & Integration Tests untuk Kontrak, URL Guard, Split-Screen Ratio,
+// EmergencyVerifier, OfflineQueue, & Persistensi Sesi Anti-Refresh
 
 import { describe, expect, it } from 'vitest';
+import { EXAM_METRICS, PersistedExamStateSchema } from '@/contracts/exam';
 import { EmergencyVerifier } from '@/core/security/emergencyVerifier';
 import { OfflineViolationQueue } from '@/core/storage/offlineQueue';
 import {
@@ -10,6 +12,11 @@ import {
   validateAndNormalizeExamUrl,
 } from '@/core/url/examUrl';
 import { isWindowWidthUnshrunk } from '@/features/lockdown/screenCheck';
+import {
+  clearPersistedExamState,
+  loadPersistedExamState,
+  savePersistedExamState,
+} from '@/features/lockdown/sessionPersistence';
 
 describe('Validasi & Normalisasi Tautan Ujian', () => {
   it('menerima tautan pendek s.id tanpa skema https dan menambahkannya otomatis', () => {
@@ -73,7 +80,6 @@ describe('EmergencyVerifier (Web Crypto SHA-256 & Anti Brute-Force)', () => {
     const clientKey = '127.0.0.1:ses_test_1';
     const baseTime = 1_700_000_000_000;
 
-    // 4 kali salah pertama mengembalikan sisa percobaan 4 -> 1
     for (let attempt = 1; attempt <= 4; attempt += 1) {
       const res = await verifier.verify('111111', clientKey, baseTime + attempt * 100);
       expect(res.verified).toBe(false);
@@ -81,21 +87,61 @@ describe('EmergencyVerifier (Web Crypto SHA-256 & Anti Brute-Force)', () => {
       expect(res.remainingAttempts).toBe(5 - attempt);
     }
 
-    // Kesalahan ke-5 langsung memicu lockout 30 detik
     const fifth = await verifier.verify('111111', clientKey, baseTime + 500);
     expect(fifth.verified).toBe(false);
     expect(fifth.lockedOut).toBe(true);
     expect(fifth.remainingLockoutSeconds).toBe(30);
 
-    // Selama lockout 30 detik, bahkan kode benar ditolak sampai cooldown habis
     const duringLock = await verifier.verify('202627', clientKey, baseTime + 10_000);
     expect(duringLock.verified).toBe(false);
     expect(duringLock.lockedOut).toBe(true);
 
-    // Setelah 31 detik, kode sah berhasil diverifikasi
     const afterCooldown = await verifier.verify('202627', clientKey, baseTime + 31_000);
     expect(afterCooldown.verified).toBe(true);
     expect(afterCooldown.lockedOut).toBe(false);
+  });
+});
+
+describe('Persistensi Anti-Refresh & Ambang Hard Lock', () => {
+  it('menetapkan ambang Hard Lock tepat pada Strike ke-2 dan cooldown 5 detik', () => {
+    expect(EXAM_METRICS.HARD_LOCK_STRIKE_THRESHOLD).toBe(2);
+    expect(EXAM_METRICS.STRIKE_COOLDOWN_SECONDS).toBe(5);
+    expect(EXAM_METRICS.BRIEF_EXCUSED_SECONDS).toBe(0);
+  });
+
+  it('memvalidasi struktur PersistedExamState secara ketat dengan Zod dan aman dipanggil di SSR/Node', () => {
+    const valid = PersistedExamStateSchema.safeParse({
+      session: {
+        sessionId: 'ses_123',
+        rawInputUrl: 'https://forms.gle/abc',
+        embedFormUrl: 'https://docs.google.com/forms/d/e/1/viewform?embedded=true',
+        examTitle: 'Ujian Google Form',
+        subject: 'Ujian Google Form',
+        className: 'Aplikasi PWA (Terkunci)',
+        startedAt: new Date().toISOString(),
+        requiresFullscreen: false,
+        isPwaStandalone: true,
+      },
+      strikeCount: 2,
+      totalAwaySeconds: 7,
+      isHardLocked: true,
+      lastLockReason: 'Halaman ujian ditinggalkan selama 4 detik!',
+      violationLogs: [
+        {
+          id: 'evt_1',
+          type: 'app_exit',
+          timestamp: new Date().toISOString(),
+          durationSeconds: 4,
+          notes: 'Halaman ujian ditinggalkan selama 4 detik!',
+        },
+      ],
+    });
+    expect(valid.success).toBe(true);
+
+    // Pastikan helper storage aman dipanggil di environment Node tanpa window
+    savePersistedExamState(valid.data!);
+    expect(loadPersistedExamState()).toBeNull();
+    clearPersistedExamState();
   });
 });
 

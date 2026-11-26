@@ -6,7 +6,31 @@ import { EXAM_METRICS } from '@/contracts/exam';
 declare global {
   interface Window {
     __NETRI_TEST_SCREEN_CLEAR__?: boolean;
+    __NETRI_TEST_PWA_STANDALONE__?: boolean;
   }
+}
+
+/** Memeriksa apakah aplikasi sedang dibuka dari mode PWA terpasang (Standalone / Layar Utama) */
+export function isStandalonePwa(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (typeof window.__NETRI_TEST_PWA_STANDALONE__ === 'boolean') {
+    return window.__NETRI_TEST_PWA_STANDALONE__;
+  }
+
+  const displayModeStandalone =
+    typeof window.matchMedia === 'function' &&
+    (window.matchMedia('(display-mode: standalone)').matches ||
+      window.matchMedia('(display-mode: fullscreen)').matches);
+  const iosStandalone =
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+  return Boolean(displayModeStandalone || iosStandalone);
+}
+
+/** Mendeteksi perangkat iPhone/iPad/iPod untuk menampilkan panduan "Tambah ke Layar Utama" Safari */
+export function isIosDevice(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /iphone|ipad|ipod/i.test(navigator.userAgent);
 }
 
 interface WebkitDocument extends Document {
