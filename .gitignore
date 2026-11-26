@@ -1,0 +1,36 @@
+# 1. Dependensi & Build Next.js
+node_modules/
+.next/
+out/
+build/
+coverage/
+playwright-report/
+test-results/
+next-env.d.ts
+*.tsbuildinfo
+
+# 2. Kredensial & Lingkungan (Secrets Shield)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+
+# 3. Direktori & Metadata AI (Clean Remote Shield - Hanya README.md)
+.agents/
+.gemini/
+.brain/
+.taste-skill/
+.system_generated/
+AGENTS.md
+GEMINI.md
+SoftwareEngineer.md
+PRD_GUIDE.md
+PRD.md
+VIDEO_DEMO.md
+implementation_plan.md
+walkthrough.md
+*.md
+!README.md
+!readme.md
